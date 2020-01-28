@@ -7,8 +7,9 @@ import java.util.*;
 
 public class Parser extends Object{
 
-   private final Chario chario;
-   private final Scanner scanner;
+   private Chario chario;
+   private Scanner scanner;
+   private SymbolTable table;
    // next token waiting to be processes
    private Token token;
 
@@ -23,12 +24,14 @@ public class Parser extends Object{
       chario = c;
       scanner = s;
       initHandles();
+      initTable();
       // initial token
       token = scanner.nextToken();
    }
 
    public void reset() {
       scanner.reset();
+      initTable();
       token = scanner.nextToken();
    }
 
@@ -74,12 +77,47 @@ public class Parser extends Object{
       throw new RuntimeException("Fatal error");
    }
 
+   /*
+   Three new routines for scope analysis.
+   */
+
+  private void initTable(){
+   table = new SymbolTable(chario);
+   table.enterScope();
+   table.enterSymbol("BOOLEAN");
+   table.enterSymbol("CHAR");
+   table.enterSymbol("INTEGER");
+   table.enterSymbol("TRUE");
+   table.enterSymbol("FALSE");
+}      
+
+private SymbolEntry enterId(){
+   SymbolEntry entry = null;
+   if (token.code == Token.ID)
+      entry = table.enterSymbol(token.string);
+   else
+      fatalError("identifier expected");
+   token = scanner.nextToken();
+   return entry;
+}
+
+private SymbolEntry findId(){
+   SymbolEntry entry = null;
+   if (token.code == Token.ID)
+      entry = table.findSymbol(token.string);
+   else
+      fatalError("identifier expected");
+   token = scanner.nextToken();
+   return entry;
+}
+
    // the beginning of parsing process
    // this method will either return normally or throw an exception
    // if the first syntax error is encountered
    public void parse(){
       subprogramBody();
       accept(Token.EOF, "extra symbols after logical end of program");
+      table.exitScope();
    }
 
    // each parsing method assumes the parser's token variable
@@ -102,8 +140,9 @@ public class Parser extends Object{
       accept(Token.BEGIN, "'begin' expected");
       sequenceOfStatements();
       accept(Token.END, "'end' expected");
+      table.exitScope();
       if (token.code == Token.ID)
-         token = scanner.nextToken();
+         findId();
       accept(Token.SEMI, "semicolon expected");
    }
 
@@ -114,8 +153,8 @@ public class Parser extends Object{
    private void subprogramSpecification(){
       // "procedure" is a keyword, not an identifier
       accept(Token.PROC, "'procedure' expected");
-      accept(Token.ID, "identifier expected");
-      // warning: we assume "(" indicates formalPart
+      enterId();
+      table.enterScope();
       if(token.code == Token.L_PAR){
          formalPart();
       }
@@ -139,7 +178,7 @@ public class Parser extends Object{
    // wrote by xizma
    private void parameterSpecification(){
       identifierList();
-      accept(Token.COLON, "colon expected");
+      accept(Token.COLON, "':' expected");
       mode();
       // warning: we ignore <type> now
       name();
@@ -306,7 +345,7 @@ public class Parser extends Object{
       accept(Token.RANGE, "'range' expected");
       simpleExpression();
       // TODO: which symbol is '..'?
-      accept(Token.THRU, "dot dot expected");
+      accept(Token.THRU, "'..' expected");
       simpleExpression();
    }
 
@@ -367,7 +406,7 @@ public class Parser extends Object{
   // wrote by xizma
    private void nullStatement(){
       accept(Token.NULL, "'null' expected");
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    /*
@@ -387,7 +426,7 @@ public class Parser extends Object{
       sequenceOfStatements();
       accept(Token.END, "'end' expected");
       accept(Token.LOOP, "'loop' expected");
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    // wrote by xizma
@@ -422,7 +461,7 @@ public class Parser extends Object{
 
       accept(Token.END, "'end' expected");
       accept(Token.IF, "'if' expected");
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
    /*
    exitStatement = "exit" [ "when" condition ] ";"
@@ -434,7 +473,7 @@ public class Parser extends Object{
          token = scanner.nextToken();
          condition();
       }
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    /*
@@ -453,7 +492,7 @@ public class Parser extends Object{
       else if(token.code == Token.L_PAR){
          actualParameterPart();
       }
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    /*
@@ -478,20 +517,22 @@ public class Parser extends Object{
    }
 
    /*
-   expression = relation { "and" relation } | { "or" relation }
+   expression = relation [{ "and" relation } | { "or" relation }]
    */
    private void expression(){
       relation();
-      if (token.code == Token.AND)
-         while (token.code == Token.AND){
+      if(token.code == Token.AND){
+         while(token.code == Token.AND){
             token = scanner.nextToken();
             relation();
          }
-      else if (token.code == Token.OR)
-         while (token.code == Token.OR){
+      }
+      else if(token.code == Token.OR){
+         while(token.code == Token.OR){
             token = scanner.nextToken();
             relation();
          }
+      }
    }
 
    /*
@@ -574,7 +615,7 @@ public class Parser extends Object{
    name = identifier [ indexedComponent ]
    */
    private void name(){
-      accept(Token.ID, "identifier expected");
+      findId();
       if (token.code == Token.L_PAR)
          indexedComponent();
    }

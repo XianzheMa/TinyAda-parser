@@ -57,7 +57,7 @@ public class Token{
    // string seems to be used when this token represents a char, an identifier or a keyword
    public String string;
 
-   public Token(final int newCode) {
+   public Token(int newCode) {
       code = newCode;
       integer = 0;
       string = "";
