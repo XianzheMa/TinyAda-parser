@@ -193,6 +193,7 @@ private SymbolEntry findId(){
       // the identifier here is optional, so we need to check first
       if (token.code == Token.ID){
          SymbolEntry entry = findId();
+         acceptRole(entry, SymbolEntry.PROC, "must be a procedure name");
       }
       accept(Token.SEMI, "';' expected");
    }
@@ -205,6 +206,7 @@ private SymbolEntry findId(){
       // "procedure" is a keyword, not an identifier
       accept(Token.PROC, "'procedure' expected");
       SymbolEntry entry = enterId();
+      entry.setRole(SymbolEntry.PROC);
       table.enterScope();
       if(token.code == Token.L_PAR){
          formalPart();
@@ -229,12 +231,12 @@ private SymbolEntry findId(){
    // wrote by xizma
    private void parameterSpecification(){
       SymbolEntry list = identifierList();
+      // TODO: what is the difference between parameters and variables?
+      list.setRole(SymbolEntry.PARAM);
       accept(Token.COLON, "':' expected");
       mode();
-      // warning: we ignore <type> now
-      name();
-      // ! in the original code name() is replaced by
-      // ! SymbolEntry entry = findId();
+      SymbolEntry entry = name();
+      acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
    }
 
    /*
@@ -341,7 +343,8 @@ private SymbolEntry findId(){
             range();
             break;
          case Token.ID:
-            name();
+            SymbolEntry entry = name();
+            acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
             break;
          default:
             fatalError("error in type definition");
@@ -356,6 +359,7 @@ private SymbolEntry findId(){
    private void enumerationTypeDefinition(){
       accept(Token.L_PAR, "'(' expected");
       SymbolEntry list = identifierList();
+      // All of the IDs here should be constants
       list.setRole(SymbolEntry.CONST);
       accept(Token.R_PAR, "')' expected");
    }
@@ -366,16 +370,16 @@ private SymbolEntry findId(){
    // wrote by xizma
    private void arrayTypeDefinition(){
       accept(Token.ARRAY, "'array' expected");
-      accept(Token.L_PAR, "left parenthesis expected");
+      accept(Token.L_PAR, "'(' expected");
       index();
       while(token.code == Token.COMMA){
          token = scanner.nextToken();
          index();
       }
-      accept(Token.R_PAR, "right parenthesis expected");
+      accept(Token.R_PAR, "')' expected");
       accept(Token.OF, "'of' expected");
-      // warning: we ignored <type>
-      name();
+      SymbolEntry entry = name();
+      acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
    }
 
    /*
@@ -391,10 +395,8 @@ private SymbolEntry findId(){
       }
       else if(token.code == Token.ID){
          // warning: we ignored <type>
-         name();
-         // ! instead of name here is the original code
-         // ! SymbolEntry entry = findId();
-         // ! acceptRole(entry, SymbolEntry.TYPE, "type name expected");
+         SymbolEntry entry = name();
+         acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
       }
       else{
          fatalError("error in index type");
@@ -545,6 +547,7 @@ private SymbolEntry findId(){
    assignmentStatement = <variable>name ":=" expression ";"
 
    previous: procedureCallStatement = <procedure>name [ actualParameterPart ] ";"
+
    modified as demanded: procedureCallStatement = <procedure>name ";"
    */
    // modified by xizma
@@ -552,8 +555,14 @@ private SymbolEntry findId(){
       SymbolEntry entry = name();
       if (token.code == Token.GETS){
          // it is an assignmentStatement
+         // TODO: check later if there is the desired behavior
+         acceptRole(entry, this.leftNames, "must be left hand side name");
          token = scanner.nextToken();
          expression();
+      }
+      else{
+         // it is a procedureCallStatement
+         acceptRole(entry, SymbolEntry.PROC, "must be a procedure name");
       }
       accept(Token.SEMI, "';' expected");
    }
@@ -660,11 +669,11 @@ private SymbolEntry findId(){
       switch (token.code){
          case Token.INT:
          case Token.CHAR:
-            // ! in the original file the following two lines do not exist.
             token = scanner.nextToken();
             break;
          case Token.ID:
             SymbolEntry entry = name();
+            acceptRole(entry, this.rightNames, "must be a right hand side name");
             break;
          case Token.L_PAR:
             token = scanner.nextToken();
