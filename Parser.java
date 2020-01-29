@@ -21,15 +21,20 @@ public class Parser extends Object{
 
    private Chario chario;
    private Scanner scanner;
-   private SymbolTable table;
    // next token waiting to be processes
    private Token token;
+   private SymbolTable table;
 
    // these sets include some of TinyAda's operator symbols
    // and the tokens that begin various declarations and statements in the language
    // see initHandles for details
-   private Set<Integer> addingOperator, multiplyingOperator, relationalOperator, basicDeclarationHandles,
-         statementHandles;
+   private Set<Integer> addingOperator,
+                        multiplyingOperator,
+                        relationalOperator,
+                        basicDeclarationHandles,
+                        statementHandles,
+                        leftNames, // Sets of roles for names (see below)
+                        rightNames;
 
    public Parser(Chario c, Scanner s) {
       // save for reference later
@@ -73,6 +78,25 @@ public class Parser extends Object{
       statementHandles.add(Token.LOOP);
       statementHandles.add(Token.NULL);
       statementHandles.add(Token.WHILE);
+      leftNames = new HashSet<Integer>();                 // Name roles for targets of assignment statement
+      leftNames.add(SymbolEntry.PARAM);
+      leftNames.add(SymbolEntry.VAR);
+      rightNames = new HashSet<Integer>(leftNames);       // Name roles for names in expressions
+      rightNames.add(SymbolEntry.CONST);
+   }
+
+   /*
+   Two new routines for role analysis.
+   */
+
+  private void acceptRole(SymbolEntry s, int expected, String errorMessage){
+      if (s.role != SymbolEntry.NONE && s.role != expected)
+         chario.putError(errorMessage);
+   }
+
+   private void acceptRole(SymbolEntry s, Set<Integer> expected, String errorMessage){
+      if (s.role != SymbolEntry.NONE && ! (expected.contains(s.role)))
+         chario.putError(errorMessage);
    }
 
    // accept() and fatalError() are two utility methods
@@ -100,11 +124,16 @@ public class Parser extends Object{
    table.enterScope();
    // There are five predefined identifiers
    // TODO: what is the definition of an identifier?
-   table.enterSymbol("BOOLEAN");
-   table.enterSymbol("CHAR");
-   table.enterSymbol("INTEGER");
-   table.enterSymbol("TRUE");
-   table.enterSymbol("FALSE");
+   SymbolEntry entry = table.enterSymbol("BOOLEAN");
+   entry.setRole(SymbolEntry.TYPE);
+   entry = table.enterSymbol("CHAR");
+   entry.setRole(SymbolEntry.TYPE);
+   entry = table.enterSymbol("INTEGER");
+   entry.setRole(SymbolEntry.TYPE);
+   entry = table.enterSymbol("TRUE");
+   entry.setRole(SymbolEntry.CONST);
+   entry = table.enterSymbol("FALSE");
+   entry.setRole(SymbolEntry.CONST);
 }      
 
 // first check the token's code to determine that it is an identifier
@@ -162,8 +191,9 @@ private SymbolEntry findId(){
       accept(Token.END, "'end' expected");
       table.exitScope();
       // the identifier here is optional, so we need to check first
-      if (token.code == Token.ID)
-         findId();
+      if (token.code == Token.ID){
+         SymbolEntry entry = findId();
+      }
       accept(Token.SEMI, "';' expected");
    }
 
@@ -174,7 +204,7 @@ private SymbolEntry findId(){
    private void subprogramSpecification(){
       // "procedure" is a keyword, not an identifier
       accept(Token.PROC, "'procedure' expected");
-      enterId();
+      SymbolEntry entry = enterId();
       table.enterScope();
       if(token.code == Token.L_PAR){
          formalPart();
@@ -198,11 +228,13 @@ private SymbolEntry findId(){
    */
    // wrote by xizma
    private void parameterSpecification(){
-      identifierList();
+      SymbolEntry list = identifierList();
       accept(Token.COLON, "':' expected");
       mode();
       // warning: we ignore <type> now
       name();
+      // ! in the original code name() is replaced by
+      // ! SymbolEntry entry = findId();
    }
 
    /*
@@ -260,15 +292,18 @@ private SymbolEntry findId(){
          identifierList ":" "constant" ":=" <static>expression ";"
    */
    private void numberOrObjectDeclaration(){
-      identifierList();
+      SymbolEntry list = identifierList();
       accept(Token.COLON, "':' expected");
       if (token.code == Token.CONST){
+         list.setRole(SymbolEntry.CONST);
          token = scanner.nextToken();
          accept(Token.GETS, "':=' expected");
          expression();
       }
-      else
+      else{
+         list.setRole(SymbolEntry.VAR);
          typeDefinition();
+      }
       accept(Token.SEMI, "';' expected");
    }
 
@@ -278,7 +313,8 @@ private SymbolEntry findId(){
    // wrote by xizma
    private void typeDeclaration(){
       accept(Token.TYPE, "'type' expected");
-      enterId();
+      SymbolEntry entry = enterId();
+      entry.setRole(SymbolEntry.TYPE);
       accept(Token.IS, "'is' expected");
       typeDefinition();
       accept(Token.SEMI, "';' expected");
@@ -318,9 +354,10 @@ private SymbolEntry findId(){
    */
    // wrote by xizma
    private void enumerationTypeDefinition(){
-      accept(Token.L_PAR, "left parenthesis expected");
-      identifierList();
-      accept(Token.R_PAR, "right parenthesis expected");
+      accept(Token.L_PAR, "'(' expected");
+      SymbolEntry list = identifierList();
+      list.setRole(SymbolEntry.CONST);
+      accept(Token.R_PAR, "')' expected");
    }
 
    /*
@@ -355,9 +392,12 @@ private SymbolEntry findId(){
       else if(token.code == Token.ID){
          // warning: we ignored <type>
          name();
+         // ! instead of name here is the original code
+         // ! SymbolEntry entry = findId();
+         // ! acceptRole(entry, SymbolEntry.TYPE, "type name expected");
       }
       else{
-         fatalError("error in index");
+         fatalError("error in index type");
       }
    }
 
@@ -376,13 +416,14 @@ private SymbolEntry findId(){
    identifierList = identifier { "," identifer }
    */
   // wrote by xizma
-   private void identifierList(){
+   private SymbolEntry identifierList(){
       // this method gets called every time a kind of declaration happens
-      enterId();
+      SymbolEntry list = enterId();
       while(token.code == Token.COMMA){
          token = scanner.nextToken();
-         enterId();
+         list.append(enterId());
       }
+      return list;
    }
 
    /*
@@ -508,7 +549,7 @@ private SymbolEntry findId(){
    */
    // modified by xizma
    private void assignmentOrCallStatement(){
-      name();
+      SymbolEntry entry = name();
       if (token.code == Token.GETS){
          // it is an assignmentStatement
          token = scanner.nextToken();
@@ -619,10 +660,11 @@ private SymbolEntry findId(){
       switch (token.code){
          case Token.INT:
          case Token.CHAR:
+            // ! in the original file the following two lines do not exist.
             token = scanner.nextToken();
             break;
          case Token.ID:
-            name();
+            SymbolEntry entry = name();
             break;
          case Token.L_PAR:
             token = scanner.nextToken();
@@ -636,10 +678,11 @@ private SymbolEntry findId(){
    /*
    name = identifier [ indexedComponent ]
    */
-   private void name(){
-      findId();
+   private SymbolEntry name(){
+      SymbolEntry entry = findId();
       if (token.code == Token.L_PAR)
          indexedComponent();
+      return entry;
    }
 
    /*
