@@ -8,5 +8,5 @@ procedure p(X : INTEGER) is
    end P;
 
 begin
-P(I)(J);
+P(I);
 end;

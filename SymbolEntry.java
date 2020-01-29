@@ -7,8 +7,10 @@ public class SymbolEntry extends Object{
    public static final int TYPE = 4;
    public static final int VAR = 5;
 
+   // name is just the identifier name
    private String name;
    public int role;
+   //? like a linkedlist? I don't know what it is
    public SymbolEntry next;
 
    public SymbolEntry(String id){
@@ -21,6 +23,7 @@ public class SymbolEntry extends Object{
       return "Name: " + name + "\n" + "Role: " + roleToString();
    }
 
+   // "role" is an integer defined above
    public void setRole(int r){
       role = r;
       if (next != null)

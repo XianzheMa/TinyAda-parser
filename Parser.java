@@ -3,6 +3,18 @@
 // Note that EBNF rules are provided in comments
 // Just add new methods below rules without them
 
+// Task for scope analysis:
+// entering information into a symbol table when identifier declarations are encountered,
+// and looking up this information in the symbol table when identifier references are encountered.
+
+// ! Detailed instruction:
+// 1. Before parsing begins, a new table of level 0 is pushed onto the stack
+//    and the predefined identifiers are loaded in.
+// 2. When a scope is exited, at the end of a procedure declaration, the table at the top is popped.
+// 3. Whenever an identifier reference is encountered, the parser searches for that info in the stack.
+// 4. The parser can detect two scope errors: redeclaration error and undeclaration error.
+
+// ! The parser does not halt when a scope error (one of the two above) occurs
 import java.util.*;
 
 public class Parser extends Object{
@@ -71,6 +83,7 @@ public class Parser extends Object{
       token = scanner.nextToken();
    }
 
+   // The call to this method would trigger a runtime exception.
    private void fatalError(String errorMessage) {
       // print an error message before throwing the exception
       chario.putError(errorMessage);
@@ -82,8 +95,11 @@ public class Parser extends Object{
    */
 
   private void initTable(){
+   // When it's newly created, its level is -1 and its stack is empty
    table = new SymbolTable(chario);
    table.enterScope();
+   // There are five predefined identifiers
+   // TODO: what is the definition of an identifier?
    table.enterSymbol("BOOLEAN");
    table.enterSymbol("CHAR");
    table.enterSymbol("INTEGER");
@@ -91,6 +107,8 @@ public class Parser extends Object{
    table.enterSymbol("FALSE");
 }      
 
+// first check the token's code to determine that it is an identifier
+// If it is, register this identifier in the table and return the entry
 private SymbolEntry enterId(){
    SymbolEntry entry = null;
    if (token.code == Token.ID)
@@ -101,6 +119,8 @@ private SymbolEntry enterId(){
    return entry;
 }
 
+// consume the next token (representing an identifier)
+// and find the corresponding entry in the table
 private SymbolEntry findId(){
    SymbolEntry entry = null;
    if (token.code == Token.ID)
@@ -141,9 +161,10 @@ private SymbolEntry findId(){
       sequenceOfStatements();
       accept(Token.END, "'end' expected");
       table.exitScope();
+      // the identifier here is optional, so we need to check first
       if (token.code == Token.ID)
          findId();
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    /*
@@ -248,7 +269,7 @@ private SymbolEntry findId(){
       }
       else
          typeDefinition();
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
 
    /*
@@ -257,10 +278,10 @@ private SymbolEntry findId(){
    // wrote by xizma
    private void typeDeclaration(){
       accept(Token.TYPE, "'type' expected");
-      accept(Token.ID, "identifier expected");
+      enterId();
       accept(Token.IS, "'is' expected");
       typeDefinition();
-      accept(Token.SEMI, "semicolon expected");
+      accept(Token.SEMI, "';' expected");
    }
    /*
    typeDefinition = enumerationTypeDefinition | arrayTypeDefinition
@@ -291,6 +312,7 @@ private SymbolEntry findId(){
             break;
       }
    }
+
    /*
    enumerationTypeDefinition = "(" identifierList ")"
    */
@@ -300,6 +322,7 @@ private SymbolEntry findId(){
       identifierList();
       accept(Token.R_PAR, "right parenthesis expected");
    }
+
    /*
    arrayTypeDefinition = "array" "(" index { "," index } ")" "of" <type>name
    */
@@ -337,6 +360,7 @@ private SymbolEntry findId(){
          fatalError("error in index");
       }
    }
+
    /*
    range = "range " simpleExpression ".." simpleExpression
    */
@@ -344,7 +368,6 @@ private SymbolEntry findId(){
    private void range(){
       accept(Token.RANGE, "'range' expected");
       simpleExpression();
-      // TODO: which symbol is '..'?
       accept(Token.THRU, "'..' expected");
       simpleExpression();
    }
@@ -354,10 +377,11 @@ private SymbolEntry findId(){
    */
   // wrote by xizma
    private void identifierList(){
-      accept(Token.ID, "identifier expected");
+      // this method gets called every time a kind of declaration happens
+      enterId();
       while(token.code == Token.COMMA){
          token = scanner.nextToken();
-         accept(Token.ID, "identifier expected");
+         enterId();
       }
    }
 
@@ -479,7 +503,8 @@ private SymbolEntry findId(){
    /*
    assignmentStatement = <variable>name ":=" expression ";"
 
-   procedureCallStatement = <procedure>name [ actualParameterPart ] ";"
+   previous: procedureCallStatement = <procedure>name [ actualParameterPart ] ";"
+   modified as demanded: procedureCallStatement = <procedure>name ";"
    */
    // modified by xizma
    private void assignmentOrCallStatement(){
@@ -489,9 +514,6 @@ private SymbolEntry findId(){
          token = scanner.nextToken();
          expression();
       }
-      else if(token.code == Token.L_PAR){
-         actualParameterPart();
-      }
       accept(Token.SEMI, "';' expected");
    }
 
@@ -499,15 +521,15 @@ private SymbolEntry findId(){
    actualParameterPart = "(" expression { "," expression } ")"
    */
    // wrote by xizma
-   private void actualParameterPart(){
-      accept(Token.L_PAR, "left parenthesis expected");
-      expression();
-      while(token.code == Token.COMMA){
-         token = scanner.nextToken();
-         expression();
-      }
-      accept(Token.R_PAR, "right parenthesis expected");
-   }
+   // private void actualParameterPart(){
+   //    accept(Token.L_PAR, "left parenthesis expected");
+   //    expression();
+   //    while(token.code == Token.COMMA){
+   //       token = scanner.nextToken();
+   //       expression();
+   //    }
+   //    accept(Token.R_PAR, "right parenthesis expected");
+   // }
 
    /*
    condition = <boolean>expression

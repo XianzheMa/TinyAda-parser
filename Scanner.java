@@ -104,6 +104,8 @@ public class Scanner extends Object{
       if (ch == '_')
          chario.putError("illegal leading '_'");
       do{
+         // this is why we say "identifiers are not case sensitive"
+         // their names are all converted to upper case.
          ch = Character.toUpperCase(ch);
          i++;
          tokenBuffer.append(ch);
