@@ -18,13 +18,21 @@
 import java.util.*;
 
 public class Parser extends Object{
+   // some constants deciding parsing mode
+   // only reports syntax error
+   static public final int NONE = 0;
+   // includes scope analysis
+   static public final int SCOPE = 1;
+   // includes both scope analysis and role analysis
+   static public final int ROLE = 2;
+
 
    private Chario chario;
    private Scanner scanner;
    // next token waiting to be processes
    private Token token;
    private SymbolTable table;
-
+   private final int mode;
    // these sets include some of TinyAda's operator symbols
    // and the tokens that begin various declarations and statements in the language
    // see initHandles for details
@@ -36,10 +44,11 @@ public class Parser extends Object{
                         leftNames, // Sets of roles for names (see below)
                         rightNames;
 
-   public Parser(Chario c, Scanner s) {
+   public Parser(Chario c, Scanner s, int mode) {
       // save for reference later
       chario = c;
       scanner = s;
+      this.mode = mode;
       initHandles();
       initTable();
       // initial token
@@ -90,15 +99,33 @@ public class Parser extends Object{
    */
 
   private void acceptRole(SymbolEntry s, int expected, String errorMessage){
-      if (s.role != SymbolEntry.NONE && s.role != expected)
-         chario.putError(errorMessage);
+      if (this.mode == Parser.ROLE){
+         if (s.role != SymbolEntry.NONE && s.role != expected){
+            chario.putError(errorMessage);
+         }
+      }
    }
 
    private void acceptRole(SymbolEntry s, Set<Integer> expected, String errorMessage){
-      if (s.role != SymbolEntry.NONE && ! (expected.contains(s.role)))
-         chario.putError(errorMessage);
+      if (this.mode == Parser.ROLE){
+         if (s.role != SymbolEntry.NONE && ! (expected.contains(s.role))){
+            chario.putError(errorMessage);
+         }
+      }
    }
 
+   // provide an adapter for dealing with cases when we don't want to do scope or role analysis
+   private void setRole(SymbolEntry s, final int role){
+      if (this.mode == Parser.ROLE){
+         s.setRole(role);
+      }
+   }
+
+   private void appendEntry(SymbolEntry head, SymbolEntry tail){
+      if (this.mode == Parser.SCOPE || this.mode == Parser.ROLE){
+         head.append(tail);
+      }
+   }
    // accept() and fatalError() are two utility methods
    // accept() only compares their code
    private void accept(int expected, String errorMessage) {
@@ -118,32 +145,52 @@ public class Parser extends Object{
    Three new routines for scope analysis.
    */
 
-  private void initTable(){
+   private void initTable(){
    // When it's newly created, its level is -1 and its stack is empty
-   table = new SymbolTable(chario);
-   table.enterScope();
-   // There are five predefined identifiers
-   // TODO: what is the definition of an identifier?
-   SymbolEntry entry = table.enterSymbol("BOOLEAN");
-   entry.setRole(SymbolEntry.TYPE);
-   entry = table.enterSymbol("CHAR");
-   entry.setRole(SymbolEntry.TYPE);
-   entry = table.enterSymbol("INTEGER");
-   entry.setRole(SymbolEntry.TYPE);
-   entry = table.enterSymbol("TRUE");
-   entry.setRole(SymbolEntry.CONST);
-   entry = table.enterSymbol("FALSE");
-   entry.setRole(SymbolEntry.CONST);
-}      
+      if (this.mode == Parser.ROLE || this.mode == Parser.SCOPE){
+         table = new SymbolTable(chario);
+         this.enterScope();
+         // There are five predefined identifiers
+         // TODO: what is the definition of an identifier?
+         SymbolEntry entry = table.enterSymbol("BOOLEAN");
+         this.setRole(entry, SymbolEntry.TYPE);
+         entry.setRole(SymbolEntry.TYPE);
+         this.setRole(entry, SymbolEntry.TYPE);
+         entry = table.enterSymbol("CHAR");
+         this.setRole(entry, SymbolEntry.TYPE);
+         entry = table.enterSymbol("INTEGER");
+         this.setRole(entry, SymbolEntry.TYPE);
+         entry = table.enterSymbol("TRUE");
+         this.setRole(entry, SymbolEntry.TYPE);
+         entry = table.enterSymbol("FALSE");
+         this.setRole(entry, SymbolEntry.TYPE);
+      }
+   }      
+
+   private void enterScope(){
+      if (this.mode == Parser.ROLE || this.mode == Parser.SCOPE){
+         table.enterScope();
+      }
+   }
+
+   private void exitScope(){
+      if (this.mode == Parser.ROLE || this.mode == Parser.SCOPE){
+         table.exitScope();
+      }
+   }
 
 // first check the token's code to determine that it is an identifier
 // If it is, register this identifier in the table and return the entry
 private SymbolEntry enterId(){
    SymbolEntry entry = null;
-   if (token.code == Token.ID)
-      entry = table.enterSymbol(token.string);
-   else
+   if (token.code == Token.ID){
+      if (this.mode == Parser.SCOPE || this.mode == Parser.ROLE){
+         entry = table.enterSymbol(token.string);
+      }
+   }
+   else{
       fatalError("identifier expected");
+   } 
    token = scanner.nextToken();
    return entry;
 }
@@ -152,10 +199,14 @@ private SymbolEntry enterId(){
 // and find the corresponding entry in the table
 private SymbolEntry findId(){
    SymbolEntry entry = null;
-   if (token.code == Token.ID)
-      entry = table.findSymbol(token.string);
-   else
+   if (token.code == Token.ID){
+      if (this.mode == Parser.SCOPE || this.mode == Parser.ROLE){
+         entry = table.findSymbol(token.string);
+      }
+   }
+   else{
       fatalError("identifier expected");
+   }
    token = scanner.nextToken();
    return entry;
 }
@@ -166,7 +217,7 @@ private SymbolEntry findId(){
    public void parse(){
       subprogramBody();
       accept(Token.EOF, "extra symbols after logical end of program");
-      table.exitScope();
+      this.exitScope();
    }
 
    // each parsing method assumes the parser's token variable
@@ -189,7 +240,7 @@ private SymbolEntry findId(){
       accept(Token.BEGIN, "'begin' expected");
       sequenceOfStatements();
       accept(Token.END, "'end' expected");
-      table.exitScope();
+      this.exitScope();
       // the identifier here is optional, so we need to check first
       if (token.code == Token.ID){
          SymbolEntry entry = findId();
@@ -206,8 +257,8 @@ private SymbolEntry findId(){
       // "procedure" is a keyword, not an identifier
       accept(Token.PROC, "'procedure' expected");
       SymbolEntry entry = enterId();
-      entry.setRole(SymbolEntry.PROC);
-      table.enterScope();
+      this.setRole(entry, SymbolEntry.PROC);
+      this.enterScope();
       if(token.code == Token.L_PAR){
          formalPart();
       }
@@ -217,13 +268,13 @@ private SymbolEntry findId(){
    */
    // wrote by xizma
    private void formalPart(){
-      accept(Token.L_PAR, "left parenthesis expected");
+      accept(Token.L_PAR, "'(' expected");
       parameterSpecification();
       while(token.code == Token.SEMI){
          token = scanner.nextToken();
          parameterSpecification();
       }
-      accept(Token.R_PAR, "right parenthesis expected");
+      accept(Token.R_PAR, "')' expected");
    }
    /*
    parameterSpecification = identifierList ":" mode <type>name
@@ -232,7 +283,7 @@ private SymbolEntry findId(){
    private void parameterSpecification(){
       SymbolEntry list = identifierList();
       // TODO: what is the difference between parameters and variables?
-      list.setRole(SymbolEntry.PARAM);
+      this.setRole(list, SymbolEntry.PARAM);
       accept(Token.COLON, "':' expected");
       mode();
       SymbolEntry entry = name();
@@ -297,13 +348,13 @@ private SymbolEntry findId(){
       SymbolEntry list = identifierList();
       accept(Token.COLON, "':' expected");
       if (token.code == Token.CONST){
-         list.setRole(SymbolEntry.CONST);
+         this.setRole(list, SymbolEntry.CONST);
          token = scanner.nextToken();
          accept(Token.GETS, "':=' expected");
          expression();
       }
       else{
-         list.setRole(SymbolEntry.VAR);
+         this.setRole(list, SymbolEntry.VAR);
          typeDefinition();
       }
       accept(Token.SEMI, "';' expected");
@@ -316,7 +367,7 @@ private SymbolEntry findId(){
    private void typeDeclaration(){
       accept(Token.TYPE, "'type' expected");
       SymbolEntry entry = enterId();
-      entry.setRole(SymbolEntry.TYPE);
+      this.setRole(entry, SymbolEntry.TYPE);
       accept(Token.IS, "'is' expected");
       typeDefinition();
       accept(Token.SEMI, "';' expected");
@@ -360,7 +411,7 @@ private SymbolEntry findId(){
       accept(Token.L_PAR, "'(' expected");
       SymbolEntry list = identifierList();
       // All of the IDs here should be constants
-      list.setRole(SymbolEntry.CONST);
+      this.setRole(list, SymbolEntry.CONST);
       accept(Token.R_PAR, "')' expected");
    }
 
@@ -394,7 +445,6 @@ private SymbolEntry findId(){
          range();
       }
       else if(token.code == Token.ID){
-         // warning: we ignored <type>
          SymbolEntry entry = name();
          acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
       }
@@ -423,7 +473,7 @@ private SymbolEntry findId(){
       SymbolEntry list = enterId();
       while(token.code == Token.COMMA){
          token = scanner.nextToken();
-         list.append(enterId());
+         this.appendEntry(list, enterId());
       }
       return list;
    }
@@ -649,17 +699,29 @@ private SymbolEntry findId(){
    factor = primary [ "**" primary ] | "not" primary
    */
    // wrote by xizma
+   // TODO: check how to interpret this rule
    private void factor(){
-      primary();
+      if (token.code == Token.NOT){
+         token = scanner.nextToken();
+         primary();
+      }
+      else{
+         primary();
+         if(token.code == Token.EXPO){
+            token = scanner.nextToken();
+            primary();
+         }
+      }
+      // primary();
       // there are three possibilities: nothing, "**" and "not"
-      if(token.code == Token.EXPO){
-         token = scanner.nextToken();
-         primary();
-      }
-      else if(token.code == Token.NOT){
-         token = scanner.nextToken();
-         primary();
-      }
+      // if(token.code == Token.EXPO){
+      //    token = scanner.nextToken();
+      //    primary();
+      // }
+      // else if(token.code == Token.NOT){
+      //    token = scanner.nextToken();
+      //    primary();
+      // }
    }
 
    /*
@@ -698,13 +760,13 @@ private SymbolEntry findId(){
    indexedComponent = "(" expression  { "," expression } ")"
    */
    private void indexedComponent(){
-      accept(Token.L_PAR, "left parenthesis expected");
+      accept(Token.L_PAR, "'(' expected");
       expression();
       while(token.code == Token.COMMA){
          token = scanner.nextToken();
          expression();
       }
-      accept(Token.R_PAR, "right parenthesis expected");
+      accept(Token.R_PAR, "')' expected");
    }
 
 }
