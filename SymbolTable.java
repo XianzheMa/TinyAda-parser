@@ -26,9 +26,9 @@ public class SymbolTable extends Object{
    }
 
    // Pop out the topmost table.
-   public void exitScope(){
+   public void exitScope(int mode){
       Map<String, SymbolEntry> table = stack.pop();
-      printTable(table);
+      printTable(table, mode);
       level--;
    }
 
@@ -60,11 +60,11 @@ public class SymbolTable extends Object{
       return EMPTY_SYMBOL;
    }
          
-   private void printTable(Map<String, SymbolEntry> table){
+   private void printTable(Map<String, SymbolEntry> table, int mode){
       chario.println("\nLevel " + level);
       chario.println("---------");
       for (SymbolEntry s : table.values())
-         chario.println(s.toString());
+         chario.println(s.toString(mode));
    }
 
 }

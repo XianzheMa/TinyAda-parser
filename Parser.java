@@ -175,7 +175,7 @@ public class Parser extends Object{
 
    private void exitScope(){
       if (this.mode == Parser.ROLE || this.mode == Parser.SCOPE){
-         table.exitScope();
+         table.exitScope(this.mode);
       }
    }
 
@@ -606,7 +606,7 @@ private SymbolEntry findId(){
       if (token.code == Token.GETS){
          // it is an assignmentStatement
          // TODO: check later if there is the desired behavior
-         acceptRole(entry, this.leftNames, "must be left hand side name");
+         acceptRole(entry, this.leftNames, "must be a parameter or variable name");
          token = scanner.nextToken();
          expression();
       }
@@ -735,7 +735,7 @@ private SymbolEntry findId(){
             break;
          case Token.ID:
             SymbolEntry entry = name();
-            acceptRole(entry, this.rightNames, "must be a right hand side name");
+            acceptRole(entry, this.rightNames, "must be a parameter, variable or constant name");
             break;
          case Token.L_PAR:
             token = scanner.nextToken();
@@ -767,6 +767,7 @@ private SymbolEntry findId(){
          expression();
       }
       accept(Token.R_PAR, "')' expected");
+      
    }
 
 }

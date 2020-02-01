@@ -19,8 +19,13 @@ public class SymbolEntry extends Object{
       next = null;
    }
 
-   public String toString(){
-      return "Name: " + name + "\n" + "Role: " + roleToString();
+   public String toString(int mode){
+      if (mode == Parser.ROLE){
+         return "Name: " + name + "\n" + "Role: " + roleToString();
+      }
+      else{
+         return "Name: " + name;
+      }
    }
 
    // "role" is an integer defined above
