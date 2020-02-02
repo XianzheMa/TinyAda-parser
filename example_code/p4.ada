@@ -2,7 +2,7 @@ procedure p4 is
 
 type color is (red, green, blue);
 
-mycolor : color(222 , 111 , 333);
+mycolor : color;
 
 begin
     if mycolor = red then

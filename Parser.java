@@ -374,7 +374,7 @@ private SymbolEntry findId(){
    }
    /*
    typeDefinition = enumerationTypeDefinition | arrayTypeDefinition
-                  | range | <type>name
+                  | range | <type>identifier
    */
    // wrote by xizma
    private void typeDefinition(){
@@ -394,7 +394,7 @@ private SymbolEntry findId(){
             range();
             break;
          case Token.ID:
-            SymbolEntry entry = name();
+            SymbolEntry entry = findId();
             acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
             break;
          default:

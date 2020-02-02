@@ -1,6 +1,6 @@
 procedure p2 is
 
-myobject, yourobject : foo(3 + 4, 7);
+myobject, yourobject : foo;
 type theirclass is range 1 .. 100;
 
 rowNumber : constant := 100 mod 7 = 0;
