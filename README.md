@@ -8,7 +8,7 @@ javac TerminalApp.java
 # How to Use
 Run TerminalApp without any command-line arguments to see detailed usage, or you can directly see it from below:
 ```
-USAGE: java -jar hw2.jar <src file> ([options])
+USAGE: java TerminalApp <src file> ([options])
 options are zero or more of:
 -s scope analysis
 -r role analysis
