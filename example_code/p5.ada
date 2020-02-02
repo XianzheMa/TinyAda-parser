@@ -3,7 +3,7 @@ procedure p5 is
 
 id1, id2, id3 : name;
 id1, id2, id3 : range 3 + 5 .. not foo mod (bar ** 2);
-id1, id2, id3 : array(symmetric, diagonal, positive(3,4)) of matrix;
+id1, id2, id3 : array(symmetric, diagonal, positive) of matrix;
 id1 : (enum1, enum2, enum3);
 
 

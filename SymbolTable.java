@@ -6,7 +6,6 @@ public class SymbolTable extends Object{
    private Stack<Map<String, SymbolEntry>> stack;
    private Chario chario;
 
-   private static final SymbolEntry EMPTY_SYMBOL = new SymbolEntry("");
 
    public SymbolTable(Chario c){
       chario = c;
@@ -38,7 +37,7 @@ public class SymbolTable extends Object{
       Map<String, SymbolEntry> table = stack.peek();
       if (table.containsKey(id)){
          chario.putError("identifier already declared in this block");
-         return EMPTY_SYMBOL;
+         return null;
       }
       else{
          SymbolEntry s = new SymbolEntry(id);
@@ -57,7 +56,7 @@ public class SymbolTable extends Object{
              return s;
       }
       chario.putError("undeclared identifier");
-      return EMPTY_SYMBOL;
+      return null;
    }
          
    private void printTable(Map<String, SymbolEntry> table, int mode){

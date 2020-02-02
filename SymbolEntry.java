@@ -10,7 +10,6 @@ public class SymbolEntry extends Object{
    // name is just the identifier name
    private String name;
    public int role;
-   //TODO: like a linkedlist? I don't know what it is
    public SymbolEntry next;
 
    public SymbolEntry(String id){

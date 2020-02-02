@@ -100,7 +100,7 @@ public class Parser extends Object{
 
   private void acceptRole(SymbolEntry s, int expected, String errorMessage){
       if (this.mode == Parser.ROLE){
-         if (s.role != SymbolEntry.NONE && s.role != expected){
+         if (s == null || (s.role != SymbolEntry.NONE && s.role != expected)){
             chario.putError(errorMessage);
          }
       }
@@ -108,7 +108,7 @@ public class Parser extends Object{
 
    private void acceptRole(SymbolEntry s, Set<Integer> expected, String errorMessage){
       if (this.mode == Parser.ROLE){
-         if (s.role != SymbolEntry.NONE && ! (expected.contains(s.role))){
+         if (s == null || (s.role != SymbolEntry.NONE && ! (expected.contains(s.role)))){
             chario.putError(errorMessage);
          }
       }
@@ -116,14 +116,16 @@ public class Parser extends Object{
 
    // provide an adapter for dealing with cases when we don't want to do scope or role analysis
    private void setRole(SymbolEntry s, final int role){
-      if (this.mode == Parser.ROLE){
+      if (this.mode == Parser.ROLE && s != null){
          s.setRole(role);
       }
    }
 
    private void appendEntry(SymbolEntry head, SymbolEntry tail){
       if (this.mode == Parser.SCOPE || this.mode == Parser.ROLE){
-         head.append(tail);
+         if(head != null){
+            head.append(tail);
+         }
       }
    }
    // accept() and fatalError() are two utility methods
@@ -151,19 +153,16 @@ public class Parser extends Object{
          table = new SymbolTable(chario);
          this.enterScope();
          // There are five predefined identifiers
-         // TODO: what is the definition of an identifier?
          SymbolEntry entry = table.enterSymbol("BOOLEAN");
-         this.setRole(entry, SymbolEntry.TYPE);
-         entry.setRole(SymbolEntry.TYPE);
          this.setRole(entry, SymbolEntry.TYPE);
          entry = table.enterSymbol("CHAR");
          this.setRole(entry, SymbolEntry.TYPE);
          entry = table.enterSymbol("INTEGER");
          this.setRole(entry, SymbolEntry.TYPE);
          entry = table.enterSymbol("TRUE");
-         this.setRole(entry, SymbolEntry.TYPE);
+         this.setRole(entry, SymbolEntry.CONST);
          entry = table.enterSymbol("FALSE");
-         this.setRole(entry, SymbolEntry.TYPE);
+         this.setRole(entry, SymbolEntry.CONST);
       }
    }      
 
@@ -277,16 +276,15 @@ private SymbolEntry findId(){
       accept(Token.R_PAR, "')' expected");
    }
    /*
-   parameterSpecification = identifierList ":" mode <type>name
+   parameterSpecification = identifierList ":" mode <type>identifier
    */
    // wrote by xizma
    private void parameterSpecification(){
       SymbolEntry list = identifierList();
-      // TODO: what is the difference between parameters and variables?
       this.setRole(list, SymbolEntry.PARAM);
       accept(Token.COLON, "':' expected");
       mode();
-      SymbolEntry entry = name();
+      SymbolEntry entry = findId();
       acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
    }
 
@@ -416,7 +414,7 @@ private SymbolEntry findId(){
    }
 
    /*
-   arrayTypeDefinition = "array" "(" index { "," index } ")" "of" <type>name
+   arrayTypeDefinition = "array" "(" index { "," index } ")" "of" <type>identifier
    */
    // wrote by xizma
    private void arrayTypeDefinition(){
@@ -429,12 +427,12 @@ private SymbolEntry findId(){
       }
       accept(Token.R_PAR, "')' expected");
       accept(Token.OF, "'of' expected");
-      SymbolEntry entry = name();
+      SymbolEntry entry = findId();
       acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
    }
 
    /*
-   index = range | <type>name
+   index = range | <type>identifier
    */
    // wrote by xizma
    private void index(){
@@ -445,11 +443,11 @@ private SymbolEntry findId(){
          range();
       }
       else if(token.code == Token.ID){
-         SymbolEntry entry = name();
+         SymbolEntry entry = findId();
          acceptRole(entry, SymbolEntry.TYPE, "must be a type name");
       }
       else{
-         fatalError("error in index type");
+         fatalError("error in index");
       }
    }
 
@@ -605,7 +603,6 @@ private SymbolEntry findId(){
       SymbolEntry entry = name();
       if (token.code == Token.GETS){
          // it is an assignmentStatement
-         // TODO: check later if there is the desired behavior
          acceptRole(entry, this.leftNames, "must be a parameter or variable name");
          token = scanner.nextToken();
          expression();
@@ -699,7 +696,6 @@ private SymbolEntry findId(){
    factor = primary [ "**" primary ] | "not" primary
    */
    // wrote by xizma
-   // TODO: check how to interpret this rule
    private void factor(){
       if (token.code == Token.NOT){
          token = scanner.nextToken();
